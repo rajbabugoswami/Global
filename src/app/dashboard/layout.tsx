@@ -1,69 +1,71 @@
-import { Home, MessageSquare, Users, Phone, Settings, LogOut, Bell } from "lucide-react";
+"use client";
+import { Home, MessageSquare, Users, Phone, Settings, LogOut, Bell, Shield } from "lucide-react";
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      {/* Sidebar Navigation */}
-      <aside className="w-20 lg:w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col justify-between hidden md:flex transition-all">
-        <div>
-          <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-gray-200 dark:border-gray-800">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
-                G
-              </div>
-              <span className="hidden lg:block text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-                GlobalConnect
-              </span>
-            </Link>
-          </div>
+  const { data: session } = useSession();
 
-          <nav className="p-4 space-y-2">
-            <NavItem href="/dashboard" icon={<MessageSquare />} label="Chats" active />
-            <NavItem href="/dashboard/calls" icon={<Phone />} label="Calls" />
-            <NavItem href="/dashboard/contacts" icon={<Users />} label="Contacts" />
+  return (
+    <div className="flex h-[calc(100vh-80px)] bg-[#050510] overflow-hidden">
+      {/* Sidebar Navigation */}
+      <aside className="w-20 lg:w-64 bg-[#050510]/80 backdrop-blur-3xl border-r border-white/10 flex flex-col justify-between hidden md:flex transition-all z-20">
+        <div>
+          <nav className="p-4 space-y-2 mt-4">
+            <NavItem href="/dashboard" icon={<Phone />} label="Random Match" />
+            <NavItem href="/dashboard/chats" icon={<MessageSquare />} label="Private Chats" />
+            <NavItem href="/dashboard/groups" icon={<Users />} label="Communities" />
             <NavItem href="/dashboard/notifications" icon={<Bell />} label="Notifications" />
+            
+            {/* Admin Panel Link */}
+            {((session?.user as any)?.role === "ADMIN" || (session?.user as any)?.role === "MODERATOR") && (
+              <div className="pt-4 mt-4 border-t border-white/10">
+                <NavItem href="/admin" icon={<Shield className="text-red-400" />} label="Admin Panel" />
+              </div>
+            )}
           </nav>
         </div>
 
-        <div className="p-4 space-y-2 border-t border-gray-200 dark:border-gray-800">
+        <div className="p-4 space-y-2 border-t border-white/10">
           <NavItem href="/dashboard/settings" icon={<Settings />} label="Settings" />
-          <button className="w-full flex items-center gap-3 p-3 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-500 transition-colors">
+          <button 
+            onClick={() => signOut()}
+            className="w-full flex items-center gap-3 p-3 rounded-xl text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors shadow-sm"
+          >
             <LogOut className="w-5 h-5" />
             <span className="hidden lg:block font-medium">Log out</span>
           </button>
           
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 flex items-center gap-3">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-10 h-10 rounded-full bg-gray-100" />
+          <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-3">
+            <div className="relative">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${session?.user?.email || "User"}`} alt="Avatar" className="w-10 h-10 rounded-full bg-white/10 border border-white/20" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-[#050510] rounded-full shadow-[0_0_10px_rgba(74,222,128,0.5)]"></div>
+            </div>
             <div className="hidden lg:block overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">John Doe</p>
-              <p className="text-xs text-gray-500 truncate">Online</p>
+              <p className="text-sm font-medium text-white truncate">{session?.user?.name || "User"}</p>
+              <p className="text-xs text-gray-400 truncate">Online in 3D</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-950">
+      <main className="flex-1 flex flex-col min-w-0 bg-[#050510]">
         {children}
       </main>
     </div>
   );
 }
 
-function NavItem({ href, icon, label, active = false }: { href: string, icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ href, icon, label }: { href: string, icon: React.ReactNode, label: string }) {
   return (
     <Link 
       href={href}
-      className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-        active 
-          ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 font-medium" 
-          : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 font-medium"
-      }`}
+      className={`flex items-center gap-3 p-3 rounded-xl transition-all text-gray-400 hover:bg-white/10 hover:text-white font-medium hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]`}
     >
       <div className="w-5 h-5">{icon}</div>
       <span className="hidden lg:block">{label}</span>

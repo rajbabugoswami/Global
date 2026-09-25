@@ -1,4 +1,5 @@
-import { definePrismaConfig } from "prisma/config";
+// @ts-ignore
+import { definePrismaConfig } from "@prisma/config";
 
 export default definePrismaConfig({
   skills: {

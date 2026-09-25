@@ -34,12 +34,33 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           email: user.email,
+          role: user.role
         };
       }
     })
   ],
   session: {
     strategy: "jwt"
+  },
+  callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id;
+        token.role = (user as any).role || "USER";
+      }
+      if (trigger === "update" && session?.name) {
+        token.name = session.name;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token) {
+        session.user.name = token.name as string;
+        (session.user as any).id = token.id;
+        (session.user as any).role = token.role;
+      }
+      return session;
+    }
   },
   pages: {
     signIn: "/login",

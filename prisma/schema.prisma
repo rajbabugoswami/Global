@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -15,89 +15,319 @@ model User {
   image         String?
   phoneNumber   String?   @unique
   passwordHash  String?
-  role          String    @default("USER")
-  status        String    @default("OFFLINE")
-  countryId     String?
-  languageId    String?
-  
+
+  // Advanced Roles & Status
+  role       String  @default("USER")
+  status     String  @default("OFFLINE")
+  isVerified Boolean @default(false)
+  isBanned   Boolean @default(false)
+
+  countryId  String?
+  languageId String?
+
+  // Advanced Settings
+  settings UserSettings?
+  privacy  UserPrivacy?
+
+  // Calling & Monetization
+  walletBalanceMins Int      @default(0)
+  dailyUsedMins     Int      @default(0)
+  lastResetDate     DateTime @default(now())
+
   // Relations
-  country       Country?  @relation(fields: [countryId], references: [id])
-  language      Language? @relation(fields: [languageId], references: [id])
-  messages      Message[]
-  groupMembers  GroupMember[]
-  sentRequests  FriendRequest[] @relation("Sender")
+  country          Country?        @relation(fields: [countryId], references: [id])
+  language         Language?       @relation(fields: [languageId], references: [id])
+  messages         Message[]
+  groupMembers     GroupMember[]
+  sentRequests     FriendRequest[] @relation("Sender")
   receivedRequests FriendRequest[] @relation("Receiver")
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  // Moderation & Blocks
+  reportsMade     UserReport[] @relation("Reporter")
+  reportsReceived UserReport[] @relation("ReportedUser")
+  blockedUsers    Block[]      @relation("Blocker")
+  blockedBy       Block[]      @relation("BlockedUser")
+
+  // Group Feed
+  posts    Post[]
+  comments Comment[]
+  likes    Like[]
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  Subscription   Subscription?
+  Transaction    Transaction[]
+  AdWatchHistory AdWatchHistory[]
+  BankAccount    BankAccount[]
+  PayoutRequest  PayoutRequest[]
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  theme         String  @default("system")
+  wallpaper     String?
+  notifications Boolean @default(true)
+  soundEnabled  Boolean @default(true)
+  lowBandwidth  Boolean @default(false)
+  callQuality   String  @default("Auto")
+
+  updatedAt DateTime @updatedAt
+}
+
+model UserPrivacy {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  whoCanSeeOnline      String  @default("EVERYONE")
+  whoCanCallMe         String  @default("EVERYONE")
+  whoCanAddMeToGroups  String  @default("EVERYONE")
+  allowReadReceipts    Boolean @default(true)
+  disappearingMessages Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+model UserReport {
+  id         String    @id @default(cuid())
+  reporterId String
+  reportedId String
+  reason     String
+  details    String?
+  status     String    @default("PENDING")
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportedUser", fields: [reportedId], references: [id], onDelete: Cascade)
 }
 
 model Country {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  code        String   @unique
+  id          String @id @default(cuid())
+  name        String @unique
+  code        String @unique
   callingCode String
   flag        String
   users       User[]
 }
 
 model Language {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  code        String   @unique
-  users       User[]
+  id    String @id @default(cuid())
+  name  String @unique
+  code  String @unique
+  users User[]
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  content   String
-  senderId  String
-  groupId   String?
-  
-  sender    User     @relation(fields: [senderId], references: [id])
-  group     Group?   @relation(fields: [groupId], references: [id])
-  
+  id           String    @id @default(cuid())
+  content      String
+  senderId     String
+  groupId      String?
+  isEdited     Boolean   @default(false)
+  isDeleted    Boolean   @default(false)
+  scheduledFor DateTime?
+
+  sender User   @relation(fields: [senderId], references: [id])
+  group  Group? @relation(fields: [groupId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Group {
-  id          String        @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
   image       String?
-  members     GroupMember[]
-  messages    Message[]
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  inviteLink  String? @unique
+  privacy     String  @default("PUBLIC") // PUBLIC, PRIVATE, INVITE_ONLY
+  category    String? @default("General")
+  isTrending  Boolean @default(false)
+
+  members  GroupMember[]
+  messages Message[]
+  posts    Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model GroupMember {
-  id        String   @id @default(cuid())
-  groupId   String
-  userId    String
-  role      String   @default("MEMBER")
-  
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  joinedAt  DateTime @default(now())
+  id      String @id @default(cuid())
+  groupId String
+  userId  String
+  role    String @default("MEMBER")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
 
   @@unique([groupId, userId])
 }
 
 model FriendRequest {
-  id         String   @id @default(cuid())
+  id         String @id @default(cuid())
   senderId   String
   receiverId String
-  status     String   @default("PENDING")
-  
-  sender     User     @relation("Sender", fields: [senderId], references: [id])
-  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  status     String @default("PENDING")
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  sender   User @relation("Sender", fields: [senderId], references: [id])
+  receiver User @relation("Receiver", fields: [receiverId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([senderId, receiverId])
 }
+
+model Post {
+  id        String  @id @default(cuid())
+  content   String
+  mediaUrl  String?
+  mediaType String? // IMAGE, VIDEO, LINK, POLL
+  groupId   String
+  authorId  String
+
+  group  Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  comments Comment[]
+  likes    Like[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comment {
+  id       String @id @default(cuid())
+  content  String
+  postId   String
+  authorId String
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model SystemSettings {
+  id                  String   @id @default("global")
+  maintenanceMode     Boolean  @default(false)
+  announcement        String?
+  maxCallDurationMins Int      @default(120)
+  maxFileUploadMB     Int      @default(50)
+  adsEnabled          Boolean  @default(false)
+  adRewardMins        Int      @default(5)
+  adsterraConfig      String?
+  adsenseConfig       String?
+  updatedAt           DateTime @updatedAt
+}
+
+model SubscriptionPlan {
+  id                    String         @id @default(cuid())
+  name                  String
+  price                 Float
+  currency              String         @default("USD")
+  durationDays          Int
+  isPremium             Boolean        @default(false)
+  dailyCallingLimitMins Int            @default(0)
+  features              String // JSON string of features
+  subscriptions         Subscription[]
+}
+
+model Subscription {
+  id        String           @id @default(cuid())
+  userId    String           @unique
+  planId    String
+  status    String           @default("ACTIVE") // ACTIVE, EXPIRED, CANCELLED
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  paymentId String?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+}
+
+model Transaction {
+  id               String   @id @default(cuid())
+  userId           String
+  amount           Float
+  currency         String
+  provider         String // RAZORPAY, STRIPE
+  providerTxId     String   @unique
+  status           String   @default("PENDING") // SUCCESS, FAILED, REFUNDED
+  
+  // Settlement & Revenue Tracking
+  gatewayFee       Float    @default(0)
+  taxAmount        Float    @default(0)
+  netAmount        Float    @default(0)
+  settlementStatus String   @default("PENDING") // PENDING, PROCESSING, SETTLED, FAILED
+  refundId         String?
+
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdWatchHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  provider       String
+  minutesGranted Int
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountName   String
+  accountNumber String
+  routingNumber String
+  bankName      String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+
+model PayoutRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, PAID
+  adminNotes  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
