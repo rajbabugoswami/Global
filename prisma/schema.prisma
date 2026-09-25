@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  phoneNumber   String?   @unique
+  passwordHash  String?
+  role          String    @default("USER")
+  status        String    @default("OFFLINE")
+  countryId     String?
+  languageId    String?
+  
+  // Relations
+  country       Country?  @relation(fields: [countryId], references: [id])
+  language      Language? @relation(fields: [languageId], references: [id])
+  messages      Message[]
+  groupMembers  GroupMember[]
+  sentRequests  FriendRequest[] @relation("Sender")
+  receivedRequests FriendRequest[] @relation("Receiver")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Country {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  callingCode String
+  flag        String
+  users       User[]
+}
+
+model Language {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  users       User[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  senderId  String
+  groupId   String?
+  
+  sender    User     @relation(fields: [senderId], references: [id])
+  group     Group?   @relation(fields: [groupId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Group {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  image       String?
+  members     GroupMember[]
+  messages    Message[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  role      String   @default("MEMBER")
+  
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt  DateTime @default(now())
+
+  @@unique([groupId, userId])
+}
+
+model FriendRequest {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     String   @default("PENDING")
+  
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([senderId, receiverId])
+}
