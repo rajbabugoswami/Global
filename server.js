@@ -2,9 +2,12 @@ import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
 
-const dev = process.env.NODE_ENV !== "production";
+const dev = process.env.NODE_ENV === "development"; // Default to production unless strictly development
 const hostname = "0.0.0.0";
 const port = parseInt(process.env.PORT || "3000", 10);
+
+console.log("Starting server with NODE_ENV:", process.env.NODE_ENV);
+console.log("Dev mode is:", dev);
 
 // Initialize the Next.js app
 const app = next({ dev, hostname, port });
